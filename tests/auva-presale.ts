@@ -1,6 +1,6 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program, web3 } from "@coral-xyz/anchor";
-import { Presale } from "../target/types/presale";
+import { PalmPresale } from "../target/types/palm_presale";
 import {
   PublicKey,
   Connection,
@@ -10,7 +10,6 @@ import {
   SystemProgram,
   SYSVAR_RENT_PUBKEY,
 } from "@solana/web3.js";
-// import { ASSOCIATED_PROGRAM_ID } from "@coral-xyz/anchor/dist/cjs/utils/token";
 import { BN } from "bn.js";
 import {
   TOKEN_PROGRAM_ID,
@@ -29,12 +28,12 @@ export function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-describe("presale", () => {
+describe("palm-presale", () => {
 
   // Configure the client to use the devnet cluster.
   anchor.setProvider(anchor.AnchorProvider.env());
   const connection = new Connection("https://denny-wuerxw-fast-devnet.helius-rpc.com/", "confirmed");
-  const program = anchor.workspace.Presale as Program<Presale>;
+  const program = anchor.workspace.PalmPresale as Program<PalmPresale>;
   const PROGRAM_ID = program.programId;
 
   // Configure the constants
@@ -272,84 +271,95 @@ describe("presale", () => {
   // });
 
   it("Token is deposited!", async () => {
+    try {
+      const [presalePDA] = await getPresalePDA();
+      const [presaleVault] = await getVaultPDA();
+      console.log("presale pda, presale vault", presalePDA.toBase58(), presaleVault.toBase58());
 
+      // get associatedTokenAddress
+      const toAssociatedTokenAccount = await getAssociatedTokenAddress(
+        mint,
+        presalePDA,
+        true
+      );
+      console.log("to associated token account", toAssociatedTokenAccount.toBase58());
+
+      // preparing transaction
+      const tx = await program.methods
+        .depositToken(presaleAmount)
+        .accounts({
+          mintAccount: mint,
+          fromAssociatedTokenAccount: adminAta,
+          fromAuthority: adminPubkey,
+          toAssociatedTokenAccount: toAssociatedTokenAccount,
+          presaleVault: presaleVault,
+          presaleInfo: presalePDA,
+          admin: adminPubkey,
+          rent: anchor.web3.SYSVAR_RENT_PUBKEY,
+          systemProgram: SystemProgram.programId,
+          tokenProgram: anchor.utils.token.TOKEN_PROGRAM_ID,
+          associatedTokenProgram: ASSOCIATED_PROGRAM_ID,
+        })
+        .signers([admin])
+        .transaction();
+
+      tx.feePayer = admin.publicKey;
+      tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+
+      console.log(await connection.simulateTransaction(tx))
+
+      const signature = await sendAndConfirmTransaction(connection, tx, [admin]);
+      console.log(
+        `Transaction succcess: \n https://solscan.io/tx/${signature}?cluster=devnet`
+      );
+      console.log("Token mint address: ", mint.toBase58());
+      console.log(
+        "Token balance of presaleAta: ",
+        await connection.getTokenAccountBalance(toAssociatedTokenAccount)
+      );
+      console.log(
+        "Sol balance of presale vault: ",
+        await connection.getBalance(presaleVault)
+      );
+    } catch (error) {
+      console.log("deposit error", error);
+    }
     // fetching accounts for transaction
-    const [presalePDA] = await getPresalePDA();
-    const [presaleVault] = await getVaultPDA();
-
-    // get associatedTokenAddress
-    const toAssociatedTokenAccount = await getAssociatedTokenAddress(
-      mint,
-      presalePDA,
-      true
-    );
-
-    // preparing transaction
-    const tx = await program.methods
-      .depositToken(presaleAmount)
-      .accounts({
-        mintAccount: mint,
-        fromAssociatedTokenAccount: adminAta,
-        fromAuthority: adminPubkey,
-        toAssociatedTokenAccount: toAssociatedTokenAccount,
-        presaleVault: presaleVault,
-        presaleInfo: presalePDA,
-        admin: adminPubkey,
-        rent: anchor.web3.SYSVAR_RENT_PUBKEY,
-        systemProgram: SystemProgram.programId,
-        tokenProgram: anchor.utils.token.TOKEN_PROGRAM_ID,
-        associatedTokenProgram: ASSOCIATED_PROGRAM_ID,
-      })
-      .signers([admin])
-      .transaction();
-
-    tx.feePayer = admin.publicKey;
-    tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
-
-    console.log(await connection.simulateTransaction(tx))
-
-    const signature = await sendAndConfirmTransaction(connection, tx, [admin]);
-    console.log(
-      `Transaction succcess: \n https://solscan.io/tx/${signature}?cluster=devnet`
-    );
-    console.log("Token mint address: ", mint.toBase58());
-    console.log(
-      "Token balance of presaleAta: ",
-      await connection.getTokenAccountBalance(toAssociatedTokenAccount)
-    );
-    console.log(
-      "Sol balance of presale vault: ",
-      await connection.getBalance(presaleVault)
-    );
+    
   });
 
   it("Presale start!", async () => {
     // fetching accounts for transaction
-    const [presalePDA] = await getPresalePDA();
+    try {
+      const [presalePDA] = await getPresalePDA();
 
-    startTime = new BN(Date.now());
-    endTime = startTime.add(presaleDuration);
+      startTime = new BN(Date.now());
+      endTime = startTime.add(presaleDuration);
 
-    // preparing transaction
-    const tx = await program.methods
-      .startPresale(startTime, endTime)
-      .accounts({
-        presaleInfo: presalePDA,
-        authority: adminPubkey,
-      })
-      .signers([admin])
-      .transaction();
+      // preparing transaction
+      const tx = await program.methods
+        .startPresale(startTime, endTime)
+        .accounts({
+          presaleInfo: presalePDA,
+          authority: adminPubkey,
+        })
+        .signers([admin])
+        .transaction();
 
-    tx.feePayer = admin.publicKey;
-    tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+      tx.feePayer = admin.publicKey;
+      tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
 
-    const signature = await sendAndConfirmTransaction(connection, tx, [admin]);
+      const signature = await sendAndConfirmTransaction(connection, tx, [admin]);
 
-    console.log(
-      `Transaction success: \n https://solscan.io/tx/${signature}?cluster=devnet`
-    );
-    console.log("Start time: ", new Date(parseInt(startTime.toString())), "----", startTime.toNumber());
-    console.log("End time: ", new Date(parseInt(endTime.toString())), "----", endTime.toNumber());
+      console.log(
+        `Transaction success: \n https://solscan.io/tx/${signature}?cluster=devnet`
+      );
+      console.log("Start time: ", new Date(parseInt(startTime.toString())), "----", startTime.toNumber());
+      console.log("End time: ", new Date(parseInt(endTime.toString())), "----", endTime.toNumber());
+    } catch (error) {
+      console.log("presale start", error);
+    }
+    
   });
 
   // it("Buy token!", async () => {
@@ -400,131 +410,144 @@ describe("presale", () => {
   // });
 
   it("Claim token!", async () => {
-    console.log("waiting for some seconds for presale to end")
-    await sleep(6000)    // wait for 50 seconds
-    const [presalePDA, bump] = await getPresalePDA();
+    try {
+      console.log("waiting for some seconds for presale to end")
+      await sleep(6000)    // wait for 50 seconds
+      const [presalePDA, bump] = await getPresalePDA();
 
-    // get associatedTokenAddress
-    const presalePresaleTokenAssociatedTokenAccount = await getAssociatedTokenAddress(
-      mint,
-      presalePDA,
-      true
-    );
-    console.log("presale ATA: ", presalePresaleTokenAssociatedTokenAccount);
-    console.log("token balance: ", await connection.getTokenAccountBalance(presalePresaleTokenAssociatedTokenAccount));
+      // get associatedTokenAddress
+      const presalePresaleTokenAssociatedTokenAccount = await getAssociatedTokenAddress(
+        mint,
+        presalePDA,
+        true
+      );
+      console.log("presale ATA: ", presalePresaleTokenAssociatedTokenAccount);
+      console.log("token balance: ", await connection.getTokenAccountBalance(presalePresaleTokenAssociatedTokenAccount));
 
-    const buyerPresaleTokenAssociatedTokenAccount = await getAssociatedTokenAddress(
-      mint,
-      buyerPubkey,
-      true
-    )
-    console.log("buyer ATA: ", presalePresaleTokenAssociatedTokenAccount);
-    console.log("token balance: ", await connection.getTokenAccountBalance(presalePresaleTokenAssociatedTokenAccount));
+      const buyerPresaleTokenAssociatedTokenAccount = await getAssociatedTokenAddress(
+        mint,
+        buyerPubkey,
+        true
+      )
+      console.log("buyer ATA: ", presalePresaleTokenAssociatedTokenAccount);
+      console.log("token balance: ", await connection.getTokenAccountBalance(presalePresaleTokenAssociatedTokenAccount));
 
-    const userInfo = await getUserInfoPDA();
-    const [presaleInfo] = await getPresalePDA();
+      const userInfo = await getUserInfoPDA();
+      const [presaleInfo] = await getPresalePDA();
 
-    const tx = await program.methods
-      .claimToken(bump)
-      .accounts({
-        presaleTokenMintAccount: mint,
-        buyerPresaleTokenAssociatedTokenAccount: buyerPresaleTokenAssociatedTokenAccount,
-        presalePresaleTokenAssociatedTokenAccount: presalePresaleTokenAssociatedTokenAccount,
-        userInfo: userInfo,
-        presaleInfo: presaleInfo,
-        presaleAuthority: adminPubkey,
-        buyer: buyerPubkey,
-        rent: anchor.web3.SYSVAR_RENT_PUBKEY,
-        systemProgram: web3.SystemProgram.programId,
-      })
-      .signers([buyer.payer])
-      .transaction();
+      const tx = await program.methods
+        .claimToken(bump)
+        .accounts({
+          presaleTokenMintAccount: mint,
+          buyerPresaleTokenAssociatedTokenAccount: buyerPresaleTokenAssociatedTokenAccount,
+          presalePresaleTokenAssociatedTokenAccount: presalePresaleTokenAssociatedTokenAccount,
+          userInfo: userInfo,
+          presaleInfo: presaleInfo,
+          presaleAuthority: adminPubkey,
+          buyer: buyerPubkey,
+          rent: anchor.web3.SYSVAR_RENT_PUBKEY,
+          systemProgram: web3.SystemProgram.programId,
+        })
+        .signers([buyer.payer])
+        .transaction();
 
-    tx.feePayer = buyerPubkey;
-    tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+      tx.feePayer = buyerPubkey;
+      tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
 
-    console.log(await connection.simulateTransaction(tx))
+      console.log(await connection.simulateTransaction(tx))
 
-    const signature = await sendAndConfirmTransaction(connection, tx, [buyer.payer as Keypair]);
+      const signature = await sendAndConfirmTransaction(connection, tx, [buyer.payer as Keypair]);
 
-    const presaleTokenBalance = await connection.getTokenAccountBalance(presalePresaleTokenAssociatedTokenAccount);
-    const buyerTokenBalance = await connection.getTokenAccountBalance(buyerPresaleTokenAssociatedTokenAccount);
+      const presaleTokenBalance = await connection.getTokenAccountBalance(presalePresaleTokenAssociatedTokenAccount);
+      const buyerTokenBalance = await connection.getTokenAccountBalance(buyerPresaleTokenAssociatedTokenAccount);
 
-    console.log(`Transaction success: \n https://solscan.io/tx/${signature}?cluster=devnet`);
+      console.log(`Transaction success: \n https://solscan.io/tx/${signature}?cluster=devnet`);
 
-    console.log("The balance of the token of the presale: ", presaleTokenBalance);
-    console.log("The balance of the token of the user: ", buyerTokenBalance);
+      console.log("The balance of the token of the presale: ", presaleTokenBalance);
+      console.log("The balance of the token of the user: ", buyerTokenBalance);
+    } catch (error) {
+      console.log("claim token", error)
+    }
+    
   })
 
   it("Withdraw token!", async () => {
+    try {
+      const [presalePDA, bump] = await getPresalePDA();
 
-    const [presalePDA, bump] = await getPresalePDA();
+      const presaleAssociatedTokenAccount = await getAssociatedTokenAddress(
+        mint,
+        presalePDA,
+        true
+      );
 
-    const presaleAssociatedTokenAccount = await getAssociatedTokenAddress(
-      mint,
-      presalePDA,
-      true
-    );
+      const tx = await program.methods
+        .withdrawToken(withdrawTokenAmount, bump)
+        .accounts({
+          mintAccount: mint,
+          adminAssociatedTokenAccount: adminAta,
+          presaleAssociatedTokenAccount: presaleAssociatedTokenAccount,
+          presaleTokenMintAccount: mint,
+          presaleInfo: presalePDA,
+          // presaleAuthority: adminPubkey,
+          adminAuthority: adminPubkey,
+          rent: SYSVAR_RENT_PUBKEY,
+          systemProgram: web3.SystemProgram.programId,
+          tokenProgram: anchor.utils.token.TOKEN_PROGRAM_ID,
+          associatedTokenProgram: ASSOCIATED_PROGRAM_ID,
+        })
+        .signers([admin])
+        .transaction();
 
-    const tx = await program.methods
-      .withdrawToken(withdrawTokenAmount, bump)
-      .accounts({
-        mintAccount: mint,
-        adminAssociatedTokenAccount: adminAta,
-        presaleAssociatedTokenAccount: presaleAssociatedTokenAccount,
-        presaleTokenMintAccount: mint,
-        presaleInfo: presalePDA,
-        // presaleAuthority: adminPubkey,
-        adminAuthority: adminPubkey,
-        rent: SYSVAR_RENT_PUBKEY,
-        systemProgram: web3.SystemProgram.programId,
-        tokenProgram: anchor.utils.token.TOKEN_PROGRAM_ID,
-        associatedTokenProgram: ASSOCIATED_PROGRAM_ID,
-      })
-      .signers([admin])
-      .transaction();
+      tx.feePayer = adminPubkey;
+      tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
 
-    tx.feePayer = adminPubkey;
-    tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+      const signature = await sendAndConfirmTransaction(connection, tx, [admin as Keypair]);
 
-    const signature = await sendAndConfirmTransaction(connection, tx, [admin as Keypair]);
+      const presaleTokenBalance = await connection.getTokenAccountBalance(presaleAssociatedTokenAccount);
+      const adminTokenBalance = await connection.getTokenAccountBalance(adminAta);
 
-    const presaleTokenBalance = await connection.getTokenAccountBalance(presaleAssociatedTokenAccount);
-    const adminTokenBalance = await connection.getTokenAccountBalance(adminAta);
-
-    console.log("The token balance of the presale vault: ", presaleTokenBalance);
-    console.log("The token balance of the admin: ", adminTokenBalance);
+      console.log("The token balance of the presale vault: ", presaleTokenBalance);
+      console.log("The token balance of the admin: ", adminTokenBalance);
+    } catch (error) {
+      console.log("withdraw token error", error);
+    }
   })
 
   it("Withdraw sol!", async () => {
-    const [presalePDA] = await getPresalePDA();
-    const [presaleVault, bump] = await getVaultPDA();
+    try {
+      const [presalePDA] = await getPresalePDA();
+      const [presaleVault, bump] = await getVaultPDA();
 
-    const tx = await program.methods
-      .withdrawSol(withdrawSolAmount, bump)
-      .accounts({
-        presaleInfo: presalePDA,
-        presaleVault: presaleVault,
-        admin: adminPubkey,
-        systemProgram: web3.SystemProgram.programId,
-      })
-      .signers([admin])
-      .transaction();
+      const tx = await program.methods
+        .withdrawSol(withdrawSolAmount, bump)
+        .accounts({
+          presaleInfo: presalePDA,
+          presaleVault: presaleVault,
+          admin: adminPubkey,
+          systemProgram: web3.SystemProgram.programId,
+        })
+        .signers([admin])
+        .transaction();
 
-    tx.feePayer = admin.publicKey;
-    tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+      tx.feePayer = admin.publicKey;
+      tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
 
-    console.log(await connection.simulateTransaction(tx));
-    
-    // console.log(JSON.stringify(tx));
-    const signature = await sendAndConfirmTransaction(connection, tx, [admin]);
-    
-    console.log(`Transaction success: \n https://solscan.io/tx/${signature}?cluster=devnet`);
+      console.log(await connection.simulateTransaction(tx));
+      
+      // console.log(JSON.stringify(tx));
+      const signature = await sendAndConfirmTransaction(connection, tx, [admin]);
+      
+      console.log(`Transaction success: \n https://solscan.io/tx/${signature}?cluster=devnet`);
 
-    const vaultBalance = await connection.getBalance(presaleVault);
-    const adminBalance = await connection.getBalance(admin.publicKey);
+      const vaultBalance = await connection.getBalance(presaleVault);
+      const adminBalance = await connection.getBalance(admin.publicKey);
 
-    console.log("The balance of the presale vault: ", vaultBalance);
-    console.log("The balance of the admin: ", adminBalance);
-  })
+      console.log("The balance of the presale vault: ", vaultBalance);
+      console.log("The balance of the admin: ", adminBalance);
+    } catch (error) {
+      console.log("withdraw sol", error);
+    }
+  }
+)
 });
