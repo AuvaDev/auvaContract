@@ -7,7 +7,7 @@ pub mod state;
 
 use instructions::*;
 
-declare_id!("HYp1PfQuDH8N24J5pe2TjekahawdwFzM5F2GUyqhZQhY");
+declare_id!("Be9UBkYH5QCfq91LoZMuGBigFGTYvERbXRDvJfB5trgc");
 
 #[program]
 pub mod presale {
@@ -86,12 +86,12 @@ pub mod presale {
     pub fn buy_token(
         ctx: Context<BuyToken>,
         token_amount: u64,
-        quote_amount: u64,
+        quote_amount_in_lamports: u64,
     ) -> Result<()> {
         return buy_token::buy_token (
             ctx,
             token_amount,
-            quote_amount,
+            quote_amount_in_lamports,
         );
     }
 
@@ -124,6 +124,10 @@ pub mod presale {
         return withdraw_token::withdraw_token (
             ctx, amount, bump
         );
+    }
+
+    pub fn require_refund(ctx: Context<Refund>) -> Result<()> {
+        instructions::require_refund::require_refund(ctx)
     }
 }
 
