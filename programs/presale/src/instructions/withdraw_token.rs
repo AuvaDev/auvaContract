@@ -23,10 +23,6 @@ pub fn withdraw_token(
 
     presale_info.deposit_token_amount = presale_info.deposit_token_amount - amount;
 
-    msg!("Transferring presale tokens to buyer {}...", &ctx.accounts.admin_authority.key());
-    msg!("Mint: {}", &ctx.accounts.mint_account.to_account_info().key());   
-    msg!("From Token Address: {}", &ctx.accounts.presale_associated_token_account.key());     
-    msg!("To Token Address: {}", &ctx.accounts.admin_associated_token_account.key());     
     token::transfer(
         CpiContext::new_with_signer(
             ctx.accounts.token_program.to_account_info(),
@@ -40,8 +36,6 @@ pub fn withdraw_token(
         amount,
     )?;
 
-    msg!("Withdrew presale tokens successfully.");
-
     Ok(())
 }
 
@@ -50,7 +44,6 @@ pub fn withdraw_token(
     bump: u8
 )]
 pub struct WithdrawToken<'info> {
-    // Presale token accounts
     #[account(mut)]
     pub mint_account: Box<Account<'info, token::Mint>>,
     
@@ -78,12 +71,6 @@ pub struct WithdrawToken<'info> {
     )]
     pub presale_info: Box<Account<'info, PresaleInfo>>,
     
-    // pub presale_authority: SystemAccount<'info>,
-    
-    // #[account(
-        // mut,
-        // constraint = admin_authority.key() == presale_info.authority.key()
-    // )]
     pub admin_authority: Signer<'info>,
     
     pub rent: Sysvar<'info, Rent>,

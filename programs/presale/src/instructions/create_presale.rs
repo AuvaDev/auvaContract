@@ -3,7 +3,6 @@ use anchor_lang::prelude::*;
 use crate::state::PresaleInfo;
 use crate::constants::PRESALE_SEED;
 
-// Edit the details for a presale
 pub fn create_presale(
     ctx: Context<CreatePresale>,
     token_mint_address: Pubkey,
@@ -27,11 +26,6 @@ pub fn create_presale(
     presale_info.authority = authority.key();
     presale_info.is_soft_capped = false;
     presale_info.is_hard_capped = false;
-
-    msg!(
-        "Presale has created for token: {}",
-        presale_info.token_mint_address
-    );
 
     Ok(())
 }

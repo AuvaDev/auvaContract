@@ -7,7 +7,6 @@ use {
 };
 
 use solana_program::clock::Clock;
-use solana_program::native_token::LAMPORTS_PER_SOL;
 
 use crate::constants::PRESALE_VAULT;
 use crate::state::PresaleInfo;
@@ -29,45 +28,30 @@ pub fn buy_token(
         .checked_div(presale_info.price_per_token)
         .ok_or(PresaleError::CalculationError)?;
 
-    // get time and compare with start and end time
     if presale_info.start_time > cur_timestamp * 1000 {
-        msg!("current time: {}", cur_timestamp);
-        msg!("start time: {}", presale_info.start_time);
         return Err(PresaleError::PresaleNotStarted.into());
     }
 
     if presale_info.end_time < cur_timestamp * 1000 {
-        msg!("start time: {}", presale_info.start_time);
-        msg!("end time: {}", presale_info.end_time);
-        msg!("current time: {}", cur_timestamp);
         return Err(PresaleError::PresaleEnded.into());
     }
 
-    // limit the presale to hardcap
     if presale_info.is_hard_capped == true {
         return Err(PresaleError::HardCapped.into())
     }
 
-    // compare the rest with the token_amount
     if token_amount > presale_info.deposit_token_amount - presale_info.sold_token_amount {
-        msg!("Calculated token amount: {}", token_amount);
-        msg!("rest token amount in presale: {}", presale_info.deposit_token_amount - presale_info.sold_token_amount);
         return Err(PresaleError::InsufficientFund.into())
     }
 
-    // limit the token_amount per address
     if presale_info.max_token_amount_per_address < (user_info.buy_token_amount + token_amount) {
-        msg!("max token amount per address: {}", presale_info.max_token_amount_per_address);
-        msg!("token amount to buy: {}", user_info.buy_token_amount + token_amount);
         return Err(PresaleError::ExceedsMaxTokenPerAddress.into())
     }
 
-    // check if the user has enough balance to buy the token
     if quote_amount_in_lamports > ctx.accounts.buyer.lamports() {
         return Err(PresaleError::InsufficientFund.into())
     }
 
-    // send SOL to contract and update the user info
     user_info.buy_time = cur_timestamp;
     user_info.buy_quote_amount_in_lamports = user_info.buy_quote_amount_in_lamports + quote_amount_in_lamports;
     user_info.buy_token_amount = user_info.buy_token_amount + token_amount;
@@ -84,17 +68,13 @@ pub fn buy_token(
         ),
         quote_amount_in_lamports
     )?;
-    
-    msg!("Presale tokens transferred successfully.");
 
     if presale_vault.get_lamports() > presale_info.softcap_amount {
         presale_info.is_soft_capped = true;
-        msg!("Presale is softcapped");
     }
     
     if presale_vault.get_lamports() > presale_info.hardcap_amount {
         presale_info.is_hard_capped = true;
-        msg!("Presale is hardcapped");
     }
 
     Ok(())
@@ -109,6 +89,7 @@ pub struct BuyToken<'info> {
     )]
     pub presale_info: Box<Account<'info, PresaleInfo>>,
 
+    /// CHECK: This is safe because we trust the authority to sign the transaction
     pub presale_authority: AccountInfo<'info>,
 
     #[account(
@@ -120,6 +101,7 @@ pub struct BuyToken<'info> {
     )]
     pub user_info: Box<Account<'info, UserInfo>>,
 
+    /// CHECK: This is safe because we trust the authority to sign the transaction
     #[account(
         mut,
         seeds = [PRESALE_VAULT],

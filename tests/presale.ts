@@ -20,52 +20,43 @@ import {
 } from "@solana/spl-token";
 import { ASSOCIATED_PROGRAM_ID } from "@coral-xyz/anchor/dist/cjs/utils/token";
 
-// import Uint8 array from admin.json
 import adminSecretArray from "./wallets/admin.json";
 import userSecretArray from "./wallets/user.json";
 
-// setting the sleeping time function
 export function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 describe("presale", () => {
 
-  // Configure the client to use the devnet cluster.
   anchor.setProvider(anchor.AnchorProvider.env());
   const connection = new Connection("https://denny-wuerxw-fast-devnet.helius-rpc.com/", "confirmed");
   const program = anchor.workspace.Presale as Program<Presale>;
   const PROGRAM_ID = program.programId;
 
-  // Configure the constants
   const PRESALE_SEED = "PRESALE_SEED";
   const USER_SEED = "USER_SEED";
   const PRESALE_VAULT = "PRESALE_VAULT";
 
-  // set admin
   console.log("admin secret key", adminSecretArray);
   const admin = Keypair.fromSecretKey(Uint8Array.from(adminSecretArray));
   console.log("adminSecretArray displayed.\n");
   const adminPubkey = admin.publicKey;
 
-  // set user
   console.log("admin secret key", adminSecretArray);
   const user = Keypair.fromSecretKey(Uint8Array.from(userSecretArray));
   console.log("userSecretArray displayed.\n");
   const userPubkey = user.publicKey;
 
-  // set token buyer
   const buyerWallet = anchor.AnchorProvider.env().wallet;
   const buyer = anchor.AnchorProvider.env().wallet as anchor.Wallet;
   const buyerPubkey = buyerWallet.publicKey;
 
-  // set tokenMint
   let mint: PublicKey;
   let adminAta: PublicKey;
   const tokenDecimal = 9;
   const amount = new BN(1000000000).mul(new BN(10 ** tokenDecimal));
 
-  // presale setting
   const softCapAmount = new BN(300000);
   const hardCapAmount = new BN(500000);
   const maxTokenAmountPerAddress = new BN(1000);
@@ -75,24 +66,19 @@ describe("presale", () => {
   const updateHardCapAmount = new BN(600000);
   const updateMaxTokenAmountPerAddress = new BN(2000);
   const updatePricePerToken = new BN(200);
-  // const startTime = new BN(1717497786561);
+
   let startTime = new BN(Date.now());
   const presaleDuration = new BN(5000);
   let endTime = startTime.add(presaleDuration);
 
-  // deposit setting
   const presaleAmount = new BN(300000000).mul(new BN(10 ** tokenDecimal));
 
-  // buyToken setting
   const quoteSolAmountInLamport = new BN(10000);
 
-  // withdraw sol setting
   const withdrawSolAmount = new BN(1);
 
-  // withdraw token setting
   const withdrawTokenAmount = new BN(1);
 
-  // address of userinfo PDA
   const getUserInfoPDA = async () => {
     return (
       await PublicKey.findProgramAddressSync(
@@ -102,7 +88,6 @@ describe("presale", () => {
     )[0];
   };
 
-  // address of presaleinfo PDA
   const getPresaleInfoPDA = async () => {
     return (
       await PublicKey.findProgramAddressSync(
@@ -112,7 +97,6 @@ describe("presale", () => {
     );
   };
 
-  // address of presalevault PDA
   const getVaultPDA = async () => {
     return (
       await PublicKey.findProgramAddressSync(
@@ -129,7 +113,6 @@ describe("presale", () => {
       (await connection.getBalance(adminPubkey)) / LAMPORTS_PER_SOL
     );
 
-    // create mint
     try {
       mint = await createMint(
         connection,
@@ -150,7 +133,6 @@ describe("presale", () => {
       ).address;
       console.log("Admin associated token account address: " + adminAta.toBase58());
 
-      // minting specific number of new tokens to the adminAta we just created
       await mintTo(
         connection,
         admin,
@@ -160,7 +142,6 @@ describe("presale", () => {
         BigInt(amount.toString())
       );
 
-      // balance of token in adminAta
       const tokenBalance = await connection.getTokenAccountBalance(adminAta);
 
       console.log("tokenBalance in adminAta: ", tokenBalance.value.uiAmount);
@@ -177,10 +158,10 @@ describe("presale", () => {
       const tx = await program.methods
         .createPresale(
           mint,
-          softCapAmount,
-          hardCapAmount,
-          maxTokenAmountPerAddress,
-          pricePerToken,
+          BigInt(softCapAmount.toString()),
+          BigInt(hardCapAmount.toString()),
+          BigInt(maxTokenAmountPerAddress.toString()),
+          BigInt(pricePerToken.toString()),
         )
         .accounts({
           presaleInfo: presaleInfoPDA,
@@ -199,7 +180,6 @@ describe("presale", () => {
 
       console.log(`Transaction success: \n https://solscan.io/tx/${signature}?cluster=devnet`);
 
-      // test result check
       const presaleInfo = await program.account.presaleInfo.fetch(presaleInfoPDA);
       console.log("presale info", presaleInfo);
 
@@ -234,7 +214,6 @@ describe("presale", () => {
       const signature = await sendAndConfirmTransaction(connection, tx, [admin]);
 
       console.log(`Transaction success: \n https://solscan.io/tx/${signature}?cluster=devnet`);
-        // update presale check
       const presaleInfo = await program.account.presaleInfo.fetch(presaleInfoPDA);
       console.log("presale info", presaleInfo);
     } catch (error) {
@@ -248,7 +227,6 @@ describe("presale", () => {
       const [presaleVault] = await getVaultPDA();
       console.log("presale pda, presale vault", presaleInfoPDA.toBase58(), presaleVault.toBase58());
 
-      // get associatedTokenAddress
       const toAssociatedTokenAccount = await getAssociatedTokenAddress(
         mint,
         presaleInfoPDA,
@@ -256,7 +234,6 @@ describe("presale", () => {
       );
       console.log("to associated token account", toAssociatedTokenAccount.toBase58());
 
-      // preparing transaction
       const tx = await program.methods
         .depositToken(presaleAmount)
         .accounts({
@@ -295,19 +272,16 @@ describe("presale", () => {
     } catch (error) {
       console.log("deposit error", error);
     }
-    // fetching accounts for transaction
     
   });
 
   it("Presale start!", async () => {
-    // fetching accounts for transaction
     try {
       const [presaleInfoPDA] = await getPresaleInfoPDA();
 
       startTime = new BN(Date.now());
       endTime = startTime.add(presaleDuration);
 
-      // preparing transaction
       const tx = await program.methods
         .startPresale(startTime, endTime)
         .accounts({
@@ -360,7 +334,6 @@ describe("presale", () => {
 
       console.log(`Transaction success: \n https://solscan.io/tx/${signature}?cluster=devnet`);
       
-      // check transaction result
       const presaleInfo = await program.account.presaleInfo.fetch(presaleInfoPDA);
       console.log("presale info", presaleInfo);
     } catch (error) {
@@ -371,10 +344,9 @@ describe("presale", () => {
   it("Claim token!", async () => {
     try {
       console.log("waiting for some seconds for presale to end")
-      await sleep(6000)    // wait for 50 seconds
+      await sleep(6000)
       const [presaleInfoPDA, bump] = await getPresaleInfoPDA();
 
-      // get associatedTokenAddress
       const presalePresaleTokenAssociatedTokenAccount = await getAssociatedTokenAddress(
         mint,
         presaleInfoPDA,
@@ -448,7 +420,6 @@ describe("presale", () => {
           presaleAssociatedTokenAccount: presaleAssociatedTokenAccount,
           presaleTokenMintAccount: mint,
           presaleInfo: presaleInfoPDA,
-          // presaleAuthority: adminPubkey,
           adminAuthority: adminPubkey,
           rent: SYSVAR_RENT_PUBKEY,
           systemProgram: web3.SystemProgram.programId,
@@ -494,7 +465,6 @@ describe("presale", () => {
 
       console.log(await connection.simulateTransaction(tx));
       
-      // console.log(JSON.stringify(tx));
       const signature = await sendAndConfirmTransaction(connection, tx, [admin]);
       
       console.log(`Transaction success: \n https://solscan.io/tx/${signature}?cluster=devnet`);

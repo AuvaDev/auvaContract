@@ -15,7 +15,6 @@ pub fn start_presale(
     presale.start_time = start_time;
     presale.end_time = end_time;
 
-    msg!("Presale has started for token: {} at the time: {}", presale.token_mint_address, start_time);
     Ok(())
 }
 

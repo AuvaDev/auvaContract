@@ -19,31 +19,21 @@ pub fn claim_token(
 
     let cur_timestamp = u64::try_from(Clock::get()?.unix_timestamp).unwrap();
 
-    // get time and compare with start and end time
     if presale_info.end_time > cur_timestamp * 1000 {
-        msg!("current time: {}", cur_timestamp);
-        msg!("presale end time: {}", presale_info.end_time);
-        msg!("Presale not ended yet.");
         return Err(PresaleError::PresaleNotEnded.into());
     }
 
     let user_info = &mut ctx.accounts.user_info;
     let claim_amount = user_info.buy_token_amount;
 
-    // Check if user has any tokens to claim
     if claim_amount == 0 {
         return Err(PresaleError::NoTokensToClaim.into());
     }
 
-    // Check if presale has enough tokens to transfer
     if presale_info.deposit_token_amount - presale_info.sold_token_amount < claim_amount {
         return Err(PresaleError::InsufficientPresaleTokens.into());
     }
 
-    msg!("Transferring presale tokens to buyer {}...", &ctx.accounts.buyer.key());
-    msg!("Mint: {}", &ctx.accounts.presale_token_mint_account.to_account_info().key());   
-    msg!("From Token Address: {}", &ctx.accounts.presale_presale_token_associated_token_account.key());     
-    msg!("To Token Address: {}", &ctx.accounts.buyer_presale_token_associated_token_account.key());     
     token::transfer(
         CpiContext::new_with_signer(
             ctx.accounts.token_program.to_account_info(),
@@ -59,14 +49,12 @@ pub fn claim_token(
 
     user_info.buy_token_amount = 0;
     user_info.claim_time = cur_timestamp;
-    msg!("All claimed presale tokens transferred successfully.");
 
     Ok(())
 }
 
 #[derive(Accounts)]
 pub struct ClaimToken<'info> {
-    // Presale token accounts
     #[account(mut)]
     pub presale_token_mint_account: Box<Account<'info, token::Mint>>,
     

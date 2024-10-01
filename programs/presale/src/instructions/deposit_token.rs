@@ -1,12 +1,9 @@
 use anchor_lang::system_program;
-// use solana_program::program::invoke;
 
 use {
     anchor_lang::prelude::*,
     anchor_spl::{associated_token, token},
 };
-
-// use solana_program::rent::Rent;
 
 use crate::constants::{PRESALE_SEED, PRESALE_VAULT, RENT_MINIMUM};
 use crate::state::PresaleInfo;
@@ -14,19 +11,6 @@ use crate::state::PresaleInfo;
 pub fn deposit_token(ctx: Context<DepositToken>, amount: u64) -> Result<()> {
     let presale_info = &mut ctx.accounts.presale_info;
 
-    // transfer token to the presaleAta
-    msg!(
-        "Mint: {}",
-        &ctx.accounts.mint_account.to_account_info().key()
-    );
-    msg!(
-        "From Token Address: {}",
-        &ctx.accounts.from_associated_token_account.key()
-    );
-    msg!(
-        "To Token Address: {}",
-        &ctx.accounts.to_associated_token_account.key()
-    );
     token::transfer(
         CpiContext::new(
             ctx.accounts.token_program.to_account_info(),
@@ -39,15 +23,6 @@ pub fn deposit_token(ctx: Context<DepositToken>, amount: u64) -> Result<()> {
         amount,
     )?;
 
-    // transfer Sol to the presaleVault
-    msg!(
-        "From Wallet Address: {}",
-        &ctx.accounts.from_associated_token_account.key()
-    );
-    msg!(
-        "To Wallet Address: {}",
-        &ctx.accounts.to_associated_token_account.key()
-    );
     system_program::transfer(
         CpiContext::new(
             ctx.accounts.system_program.to_account_info(),
@@ -60,8 +35,6 @@ pub fn deposit_token(ctx: Context<DepositToken>, amount: u64) -> Result<()> {
     )?;
 
     presale_info.deposit_token_amount = presale_info.deposit_token_amount + amount;
-
-    msg!("Tokens deposited successfully.");
 
     Ok(())
 }
@@ -86,13 +59,13 @@ pub struct DepositToken<'info> {
     )]
     pub to_associated_token_account: Account<'info, token::TokenAccount>,
 
+    /// CHECK
     #[account(
-        mut,
         init_if_needed,
         payer = payer,
         seeds = [PRESALE_VAULT],
         bump,
-        // space = 0
+        space = 0
     )]
     pub presale_vault: AccountInfo<'info>,
 
@@ -103,6 +76,7 @@ pub struct DepositToken<'info> {
     )]
     pub presale_info: Box<Account<'info, PresaleInfo>>,
 
+    /// CHECK
     #[account(mut)]
     pub payer: AccountInfo<'info>,
 
